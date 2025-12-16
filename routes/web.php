@@ -8,6 +8,13 @@ use App\Http\Controllers\PremioController;
 use App\Http\Controllers\ParticipanteController;
 use App\Http\Controllers\DashboardController;
 
+// Fix ReverseProxy https://stackoverflow.com/questions/29912997/laravel-routes-behind-reverse-proxy
+if(getenv('APP_ENV') == 'production') {
+    URL::forceRootUrl(getenv('APP_URL'));
+    URL::forceScheme("https");
+}
+
+
 /*
 |--------------------------------------------------------------------------
 | ROOT → DASHBOARD
