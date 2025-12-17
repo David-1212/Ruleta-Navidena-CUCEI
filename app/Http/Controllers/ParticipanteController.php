@@ -13,20 +13,22 @@ class ParticipanteController extends Controller
     {
         $query = Participante::query();
 
-        $premios = Premio::pluck('nombre', 'id');
         if ($request->estado === 'ganador') {
-            $query->where('ganador', true);
+            $query->whereNotNull('premio_id');
         }
-    
+
         if ($request->estado === 'no_ganador') {
-            $query->where('ganador', false);
+            $query->whereNull('premio_id');
         }
-    
+
         $participantes = $query
-            ->orderBy('nombre')
+            ->orderByRaw('premio_id IS NULL') // 👈 salen primero los que ya jugaron
+            ->orderByDesc('updated_at')       // 👈 el último que salió arriba
             ->paginate(20)
-            ->withQueryString(); // mantiene filtros en la paginación
-    
+            ->withQueryString();
+
+        $premios = Premio::pluck('nombre', 'id');
+
         return view('participantes.index', compact('participantes','premios'));
     }
 
@@ -59,15 +61,17 @@ class ParticipanteController extends Controller
         if ($request->filled('buscar')) {
             $query->where('nombre', 'like', '%' . $request->buscar . '%');
         }
-        
-    $premios = Premio::pluck('nombre', 'id');
+
         $participantes = $query
-            ->orderBy('nombre')
+            ->orderByRaw('premio_id IS NULL')
+            ->orderByDesc('updated_at')
             ->paginate(20)
             ->withQueryString();
 
-        return view('participantes._tabla', compact('participantes','premio'));
+        return view('participantes._tabla', compact('participantes'));
     }
+
+    
     public function borrarTodo()
     {
         Participante::truncate(); // elimina TODOS los registros
@@ -76,6 +80,33 @@ class ParticipanteController extends Controller
             ->route('participantes.index')
             ->with('success', 'Todos los participantes fueron eliminados');
     }
+    public function obtenerEstadisticas()
+    {
+        return response()->json([
+            'totalParticipantes' => Participante::count(),
+            'totalPremios'       => Premio::count(),
+            'premiosEntregados'  => Participante::whereNotNull('premio_id')->count(),
+            'premiosFaltantes'   => Premio::count() - Participante::whereNotNull('premio_id')->count(),
+        ]);
+    }
+    public function ultimosGanadores()
+    {
+        $ultimos = Participante::whereNotNull('premio_id')
+            ->orderByDesc('updated_at')
+            ->take(3)
+            ->with('premio') // si tienes relación
+            ->get()
+            ->map(function ($p) {
+                return [
+                    'nombre' => $p->nombre,
+                    'premio' => $p->premio->nombre ?? '—'
+                ];
+            });
+
+        return response()->json($ultimos);
+    }
+
+
 
 
 }

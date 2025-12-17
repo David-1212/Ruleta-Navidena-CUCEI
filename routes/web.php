@@ -70,9 +70,12 @@ Route::middleware('auth')->group(function () {
             ->name('participantes.importar');
         Route::delete('/participantes/borrar-todo', [ParticipanteController::class, 'borrarTodo'])
             ->name('participantes.borrarTodo');
-            Route::get('/rifa/estadisticas', [RifaController::class, 'estadisticas'])
-    ->name('rifa.estadisticas');
-
+        Route::get('/rifa/estadisticas', [ParticipanteController::class, 'obtenerEstadisticas'])
+            ->name('rifa.estadisticas');
+        Route::get('/rifa/ultimos-ganadores', [RifaController::class, 'ultimosGanadores'])
+            ->name('rifa.ultimosGanadores');
+        
+        
     });
 
     /*

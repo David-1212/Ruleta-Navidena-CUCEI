@@ -8,7 +8,7 @@
 <button
     id="btnToggleNavbar"
     class="fixed top-24 right-4 z-50 bg-green-700 hover:bg-green-800 text-white px-4 py-2 rounded-xl shadow-lg">
-    ⬆ Ocultar menú
+
 </button>
 
 <div class="min-h-screen flex flex-col justify-between bg-[url('/img/navidad-bg.png')] bg-repeat px-4">
@@ -82,6 +82,16 @@ body.navbar-hidden { overflow:hidden; }
 }
 .min-h-screen{ min-height:auto; }
 .lever.down .lever-stick{ transform:rotate(32deg); }
+.ultimo-item{
+    background:#111;
+    border-left:6px solid #22c55e;
+    padding:12px 16px;
+    border-radius:10px;
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+    box-shadow:0 0 10px rgba(34,197,94,.4);
+}
 
 /* ===== ESTADÍSTICAS ===== */
 .stat-card{
@@ -114,19 +124,19 @@ body.navbar-hidden { overflow:hidden; }
             </div>
         </div>
         <div class="stat-card">
-            🎁 Premios
+            🎁 Premios Totales
             <div class="stat-number text-yellow-400" id="statPremios">
                 {{ $totalPremios }}
             </div>
         </div>
         <div class="stat-card">
-            ✅ Entregados
+            ✅ Premios Entregados
             <div class="stat-number text-green-400" id="statEntregados">
                 {{ $premiosEntregados }}
             </div>
         </div>
         <div class="stat-card">
-            ⏳ Faltantes
+            ⏳ Premios por Entregar
             <div class="stat-number text-red-400" id="statFaltantes">
                 {{ $premiosFaltantes }}
             </div>
@@ -166,10 +176,29 @@ body.navbar-hidden { overflow:hidden; }
     </button>
 </div>
 
+<!-- 🏆 ÚLTIMOS GANADORES -->
+<div class="mt-8 max-w-3xl mx-auto">
+    <div class="bg-black/80 rounded-2xl shadow-lg p-6 text-white">
+        <h3 class="text-xl font-bold mb-4 text-center text-green-400">
+            🏆 Últimos Ganadores
+        </h3>
+
+        <ul id="listaUltimos" class="space-y-3 text-lg">
+            <li class="text-center text-gray-400">
+                Aún no hay ganadores
+            </li>
+        </ul>
+    </div>
+</div>
+
+
+
 <script>
-/* ===== NAVBAR ===== */
+/* =====================================================
+   NAVBAR
+===================================================== */
 const btnNavbar = document.getElementById('btnToggleNavbar');
-btnNavbar.addEventListener('click',()=>{
+btnNavbar.addEventListener('click', () => {
     document.body.classList.toggle('navbar-hidden');
     btnNavbar.textContent =
         document.body.classList.contains('navbar-hidden')
@@ -177,14 +206,20 @@ btnNavbar.addEventListener('click',()=>{
             : '⬆ Ocultar menú';
 });
 
-/* ===== CONFIG ===== */
+/* =====================================================
+   CONFIG
+===================================================== */
 const DURACION_GIRO = 4800;
+const STORAGE_KEY = 'ruleta_navidad_estado';
 
-/* ===== ESTADO ===== */
+/* =====================================================
+   ESTADO
+===================================================== */
 let bloqueado = false;
+let fase = 'nombre';
 let participanteId = null;
-let fase = 'nombre'; 
-// nombre → premio → fin
+let nombreActual = null;
+let premioActual = null;
 
 const nombres = @json($nombres);
 const premios = @json($premios);
@@ -194,7 +229,25 @@ const reelPremio = document.getElementById('reelPremio');
 const lever = document.getElementById('lever');
 const btnNoAsistio = document.getElementById('btnNoAsistio');
 
-/* ===== PREPARAR RULETA ===== */
+/* =====================================================
+   STORAGE
+===================================================== */
+function guardarEstado() {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify({
+        fase,
+        participanteId,
+        nombre: nombreActual,
+        premio: premioActual
+    }));
+}
+
+function limpiarEstado() {
+    localStorage.removeItem(STORAGE_KEY);
+}
+
+/* =====================================================
+   PREPARAR RULETA
+===================================================== */
 function preparar(reel, data) {
     reel.innerHTML = '';
     const lista = [];
@@ -209,13 +262,20 @@ function preparar(reel, data) {
 preparar(reelNombre, nombres);
 preparar(reelPremio, premios);
 
-/* ===== PALANCA ===== */
+reelNombre.style.transition = 'none';
+reelPremio.style.transition = 'none';
+
+/* =====================================================
+   PALANCA
+===================================================== */
 function accionar() {
     lever.classList.add('down');
     setTimeout(() => lever.classList.remove('down'), 300);
 }
 
-/* ===== GIRO ===== */
+/* =====================================================
+   GIRO ANIMADO
+===================================================== */
 function girar(reel, valor, callback) {
     const items = [...reel.children];
     items.forEach(i => i.classList.remove('active'));
@@ -224,36 +284,72 @@ function girar(reel, valor, callback) {
         .map((el, i) => el.textContent === valor ? i : null)
         .filter(i => i !== null);
 
-    const min = Math.floor(posiciones.length * 0.6);
-    const index = posiciones[min];
+    const index = posiciones[Math.floor(posiciones.length * 0.6)];
 
     reel.style.transition = 'none';
-    reel.style.transform = 'translateY(0)';
+    reel.style.transform = `translateY(0)`;
     reel.offsetHeight;
 
-    reel.style.transition =
-        `transform ${DURACION_GIRO}ms cubic-bezier(.08,.82,.17,1)`;
+    reel.style.transition = `transform ${DURACION_GIRO}ms cubic-bezier(.08,.82,.17,1)`;
     reel.style.transform = `translateY(-${index * 80 - 80}px)`;
 
     setTimeout(() => {
         items[index].classList.add('active');
         bloqueado = false;
-        if (callback) callback();
+        callback && callback();
     }, DURACION_GIRO);
 }
 
-/* ===== TECLADO ===== */
+/* =====================================================
+   POSICIONAR (RESTORE REAL)
+===================================================== */
+function posicionar(reel, valor) {
+    const items = [...reel.children];
+    items.forEach(i => i.classList.remove('active'));
+
+    const posiciones = items
+        .map((el, i) => el.textContent === valor ? i : null)
+        .filter(i => i !== null);
+
+    if (!posiciones.length) return;
+
+    const index = posiciones[Math.floor(posiciones.length * 0.6)];
+
+    reel.style.transition = 'none';
+    reel.style.transform = `translateY(-${index * 80 - 80}px)`;
+
+    requestAnimationFrame(() => {
+        items[index].classList.add('active');
+        reel.style.transition = `transform ${DURACION_GIRO}ms cubic-bezier(.08,.82,.17,1)`;
+    });
+}
+
+/* =====================================================
+   TECLADO
+===================================================== */
 document.addEventListener('keydown', e => {
     if (e.key !== 'Enter' || e.repeat || bloqueado) return;
 
+    // 🔄 SIEMPRE refresca estadísticas
+    actualizarEstadisticas();
+
     accionar();
 
-    if (fase === 'nombre') girarNombre();
-    else if (fase === 'premio') girarPremio();
-    else if (fase === 'fin') reiniciar();
+    if (fase === 'nombre') {
+        girarNombre();
+    } 
+    else if (fase === 'premio') {
+        girarPremio();
+    } 
+    else if (fase === 'fin') {
+        reiniciar();
+    }
 });
 
-/* ===== ENTER 1 → NOMBRE ===== */
+
+/* =====================================================
+   ENTER 1 → NOMBRE
+===================================================== */
 function girarNombre() {
     bloqueado = true;
 
@@ -264,14 +360,19 @@ function girarNombre() {
     .then(r => r.json())
     .then(d => {
         participanteId = d.id;
-        girar(reelNombre, d.ganador, () => {
-            btnNoAsistio.classList.remove('hidden');
+        nombreActual = d.ganador;
+
+        girar(reelNombre, nombreActual, () => {
             fase = 'premio';
+            btnNoAsistio.classList.remove('hidden');
+            guardarEstado();
         });
     });
 }
 
-/* ===== ENTER 2 → PREMIO ===== */
+/* =====================================================
+   ENTER 2 → PREMIO
+===================================================== */
 function girarPremio() {
     bloqueado = true;
 
@@ -285,14 +386,21 @@ function girarPremio() {
     })
     .then(r => r.json())
     .then(d => {
-        girar(reelPremio, d.premio, () => {
-            btnNoAsistio.classList.add('hidden');
+        premioActual = d.premio;
+
+        girar(reelPremio, premioActual, () => {
             fase = 'fin';
+            btnNoAsistio.classList.add('hidden');
+            guardarEstado();
+            actualizarEstadisticas();
+            actualizarUltimos();
         });
     });
 }
 
-/* ===== ENTER 3 → REINICIAR ===== */
+/* =====================================================
+   ENTER 3 → REINICIAR
+===================================================== */
 function reiniciar() {
     bloqueado = true;
 
@@ -300,17 +408,24 @@ function reiniciar() {
         .forEach(i => i.classList.remove('active'));
 
     participanteId = null;
+    nombreActual = null;
+    premioActual = null;
     fase = 'nombre';
 
-    setTimeout(() => {
-        bloqueado = false;
-    }, 300);
+    limpiarEstado();
+    actualizarEstadisticas();
+    actualizarUltimos();
+
+    setTimeout(() => bloqueado = false, 300);
 }
 
-/* ===== NO ASISTIÓ ===== */
+
+
+/* =====================================================
+   NO ASISTIÓ
+===================================================== */
 btnNoAsistio.addEventListener('click', () => {
     if (!participanteId || bloqueado || fase !== 'premio') return;
-
     bloqueado = true;
 
     fetch("{{ route('rifa.noAsistio') }}", {
@@ -320,17 +435,138 @@ btnNoAsistio.addEventListener('click', () => {
             'Content-Type': 'application/json'
         },
         body: JSON.stringify({ participante_id: participanteId })
-    }).then(() => {
-        [...reelNombre.children, ...reelPremio.children]
-            .forEach(i => i.classList.remove('active'));
-
-        participanteId = null;
-        fase = 'nombre';
-        btnNoAsistio.classList.add('hidden');
-        bloqueado = false;
-    });
+    }).then(() => reiniciar());
 });
+
+/* =====================================================
+   RESTAURAR AL CARGAR
+===================================================== */
+(function restaurar() {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (!raw) return;
+
+    try {
+        const data = JSON.parse(raw);
+
+        fase = data.fase;
+        participanteId = data.participanteId;
+        nombreActual = data.nombre;
+        premioActual = data.premio;
+
+        if (nombreActual) posicionar(reelNombre, nombreActual);
+        if (premioActual) posicionar(reelPremio, premioActual);
+
+        if (fase === 'premio') btnNoAsistio.classList.remove('hidden');
+        else btnNoAsistio.classList.add('hidden');
+
+    } catch {
+        limpiarEstado();
+    }
+})();
+
+/* =====================================================
+   REPOSICIONAR SI SE VUELVE A LA PESTAÑA
+===================================================== */
+document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'visible') {
+        restaurarEstado();
+    }
+});
+
+/* =====================================================
+   RESTAURAR AL CARGAR
+===================================================== */
+function restaurarEstado() {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (!raw) return;
+
+    try {
+        const data = JSON.parse(raw);
+
+        fase = data.fase;
+        participanteId = data.participanteId;
+        nombreActual = data.nombre;
+        premioActual = data.premio;
+
+        if (nombreActual) posicionar(reelNombre, nombreActual);
+        if (premioActual) posicionar(reelPremio, premioActual);
+
+        if (fase === 'premio') btnNoAsistio.classList.remove('hidden');
+        else btnNoAsistio.classList.add('hidden');
+
+    } catch {
+        limpiarEstado();
+    }
+}
+
+restaurarEstado();
+actualizarEstadisticas();
+
+/* =====================================================
+   ACTUALIZAR ESTADÍSTICAS
+===================================================== */
+
+function actualizarEstadisticas() {
+    fetch("{{ route('rifa.estadisticas') }}")
+        .then(r => r.json())
+        .then(d => {
+            document.getElementById('statParticipantes').textContent = d.totalParticipantes;
+            document.getElementById('statPremios').textContent = d.totalPremios;
+            document.getElementById('statEntregados').textContent = d.premiosEntregados;
+            document.getElementById('statFaltantes').textContent = d.premiosFaltantes;
+        })
+        .catch(err => console.error('Stats error:', err));
+}
+/* =====================================================
+   ÚLTIMOS GANADORES
+===================================================== */
+function actualizarUltimos() {
+    fetch("{{ route('rifa.ultimosGanadores') }}")
+        .then(r => r.json())
+        .then(lista => {
+            const ul = document.getElementById('listaUltimos');
+            if (!ul) return;
+
+            ul.innerHTML = '';
+
+            if (!lista.length) {
+                ul.innerHTML = `<li class="text-center text-gray-400">
+                    Aún no hay ganadores
+                </li>`;
+                return;
+            }
+
+            lista.forEach(g => {
+                const li = document.createElement('li');
+                li.className =
+                    'flex justify-between bg-green-900/40 px-3 py-2 rounded-lg';
+
+                li.innerHTML = `
+                    <span>🎄 ${g.nombre}</span>
+                    <span class="font-bold text-green-400">${g.premio}</span>
+                `;
+                ul.appendChild(li);
+            });
+        })
+        .catch(err => console.error('Ultimos error:', err));
+}
+
+
+
+// Actualiza las estadísticas cada 5 segundos (5000 milisegundos)
+setInterval(() => {
+    actualizarEstadisticas();
+}, 5000);
+
+
+
+
+// Llama a la función de restauración al cargar el script
+restaurarEstado();
 </script>
+
+
+
 
 
 

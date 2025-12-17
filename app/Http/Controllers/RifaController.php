@@ -139,6 +139,19 @@ class RifaController extends Controller
 
         return response()->json(['ok' => true]);
     }
+    public function ultimosGanadores()
+    {
+        return Participante::whereNotNull('premio_id')
+            ->with('premio')
+            ->orderByDesc('updated_at')
+            ->take(3)
+            ->get()
+            ->map(fn ($p) => [
+                'nombre' => $p->nombre,
+                'premio' => $p->premio->nombre
+            ]);
+    }
+
 
 
 }

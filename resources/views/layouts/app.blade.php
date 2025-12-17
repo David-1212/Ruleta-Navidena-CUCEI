@@ -9,7 +9,7 @@
 
     <style>
         body.app-bg {
-            background-image: url('/matute-luces-navidenas.png');
+            background-image: url('/2.png');
             background-size: cover;
             background-position: center;
             background-repeat: no-repeat;
