@@ -55,6 +55,7 @@ Route::middleware('auth')->group(function () {
         Route::get('/rifa', [RifaController::class, 'index'])->name('rifa.index');
         Route::post('/rifa/nombre', [RifaController::class, 'girarNombre'])->name('rifa.girarNombre');
         Route::post('/rifa/premio', [RifaController::class, 'girarPremio'])->name('rifa.girarPremio');
+        Route::post('/rifa/no-asistio', [RifaController::class, 'noAsistio'])->name('rifa.noAsistio');
 
         // 🎁 Premios
         Route::get('/premios', [PremioController::class, 'index'])->name('premios.index');

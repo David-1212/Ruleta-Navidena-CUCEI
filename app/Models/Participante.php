@@ -10,10 +10,14 @@ class Participante extends Model
         'nombre',
         'ganador',
         'premio_id',
+        'seleccionado',  
+        'asistio',        
     ];
 
     protected $casts = [
         'ganador' => 'boolean',
+        'seleccionado' => 'boolean',
+        'asistio' => 'boolean',
     ];
 
     public function premio()
